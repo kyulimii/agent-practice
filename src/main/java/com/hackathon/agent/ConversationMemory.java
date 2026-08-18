@@ -9,8 +9,8 @@ public class ConversationMemory {
 
     private final List<Message> history = new ArrayList<>();
 
-    public void add(String role, String content) {
-        history.add(new Message(role, content));
+    public void add(Message message) {
+        history.add(message);
     }
 
     public List<Message> all() {

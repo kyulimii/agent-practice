@@ -2,10 +2,13 @@ package com.hackathon.agent;
 
 import io.github.cdimascio.dotenv.Dotenv;
 
+import java.util.List;
 import java.util.Scanner;
 
-/** 1단계: CLI에서 대화가 이어지는 최소 에이전트 (단기 기억만). */
+/** 2단계: 도구(함수 호출)를 스스로 골라 부르는 CLI 에이전트. */
 public class Main {
+
+    private static final int MAX_TOOL_ROUNDS = 5;
 
     public static void main(String[] args) {
         Dotenv dotenv = Dotenv.configure().ignoreIfMissing().load();
@@ -20,6 +23,10 @@ public class Main {
 
         GeminiClient client = new GeminiClient(apiKey, model);
         ConversationMemory memory = new ConversationMemory();
+        ToolRegistry tools = new ToolRegistry(List.of(
+                new LeetCodeSearchTool(),
+                new ProgrammersRecommendTool()
+        ));
 
         System.out.println("에이전트와 대화를 시작합니다. 종료하려면 'exit' 또는 'quit'을 입력하세요.");
 
@@ -38,17 +45,40 @@ public class Main {
                     break;
                 }
 
-                memory.add("user", input);
-
-                try {
-                    String reply = client.send(memory.all());
-                    memory.add("model", reply);
-                    System.out.println("에이전트> " + reply);
-                } catch (GeminiClient.GeminiException e) {
-                    System.out.println("[오류] " + e.getMessage());
-                }
+                memory.add(Message.userText(input));
+                handleTurn(client, memory, tools);
             }
         }
+    }
+
+    private static void handleTurn(GeminiClient client, ConversationMemory memory, ToolRegistry tools) {
+        for (int round = 0; round < MAX_TOOL_ROUNDS; round++) {
+            Message response;
+            try {
+                response = client.send(memory.all(), tools.all());
+            } catch (GeminiClient.GeminiException e) {
+                System.out.println("[오류] " + e.getMessage());
+                return;
+            }
+            memory.add(response);
+
+            List<Part.FunctionCall> calls = response.functionCalls();
+            if (calls.isEmpty()) {
+                System.out.println("에이전트> " + response.textOrEmpty());
+                return;
+            }
+
+            for (Part.FunctionCall call : calls) {
+                System.out.println("[도구 호출] " + call.name() + "(" + call.args() + ")");
+                ToolResult result = tools.execute(call.name(), call.args());
+                if (!result.ok()) {
+                    System.out.println("[도구 실패] " + result.error());
+                }
+                memory.add(Message.functionResponse(call.name(), call.id(), result.asResponsePayload()));
+            }
+        }
+
+        System.out.println("[오류] 도구 호출이 " + MAX_TOOL_ROUNDS + "회를 넘어서 중단했습니다.");
     }
 
     private static String firstNonBlank(String... values) {
