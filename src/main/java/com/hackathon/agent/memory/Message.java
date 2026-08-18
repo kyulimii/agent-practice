@@ -1,4 +1,4 @@
-package com.hackathon.agent;
+package com.hackathon.agent.memory;
 
 import java.util.List;
 

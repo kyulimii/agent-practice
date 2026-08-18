@@ -1,4 +1,4 @@
-package com.hackathon.agent;
+package com.hackathon.agent.tools;
 
 import com.fasterxml.jackson.databind.node.ObjectNode;
 

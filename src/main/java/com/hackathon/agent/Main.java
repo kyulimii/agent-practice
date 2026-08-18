@@ -1,5 +1,13 @@
 package com.hackathon.agent;
 
+import com.hackathon.agent.gemini.GeminiClient;
+import com.hackathon.agent.memory.ConversationMemory;
+import com.hackathon.agent.memory.Message;
+import com.hackathon.agent.memory.Part;
+import com.hackathon.agent.tools.LeetCodeSearchTool;
+import com.hackathon.agent.tools.ProgrammersRecommendTool;
+import com.hackathon.agent.tools.ToolRegistry;
+import com.hackathon.agent.tools.ToolResult;
 import io.github.cdimascio.dotenv.Dotenv;
 
 import java.util.List;
@@ -46,7 +54,11 @@ public class Main {
                 }
 
                 memory.add(Message.userText(input));
-                handleTurn(client, memory, tools);
+                try {
+                    handleTurn(client, memory, tools);
+                } catch (RuntimeException e) {
+                    System.out.println("[오류] 예상치 못한 문제가 발생했어요. 다시 시도해주세요.");
+                }
             }
         }
     }
@@ -57,7 +69,7 @@ public class Main {
             try {
                 response = client.send(memory.all(), tools.all());
             } catch (GeminiClient.GeminiException e) {
-                System.out.println("[오류] " + e.getMessage());
+                System.out.println("[오류] " + e.userMessage());
                 return;
             }
             memory.add(response);
